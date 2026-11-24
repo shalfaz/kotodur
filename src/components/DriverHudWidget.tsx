@@ -75,7 +75,7 @@ export const DriverHudWidget: React.FC<DriverHudWidgetProps> = ({
         </span>
       </div>
 
-      {/* Bus Selector Strip */}
+      {/* Bus Selector Strip (01 to 06) */}
       <div className="mb-3 grid grid-cols-6 gap-1">
         {buses.map((b) => {
           const active = b.id === bus.id;
@@ -83,6 +83,7 @@ export const DriverHudWidget: React.FC<DriverHudWidgetProps> = ({
             <button
               key={b.id}
               type="button"
+              title={`${b.id} — ${b.operatorName}`}
               onClick={() => onSelectBus(b.id)}
               className={`rounded-md py-1 font-mono text-[10px] font-bold transition ${
                 active
@@ -92,7 +93,7 @@ export const DriverHudWidget: React.FC<DriverHudWidgetProps> = ({
                     : "border border-slate-200 bg-slate-100 text-slate-600 hover:border-slate-300 hover:text-slate-900"
               }`}
             >
-              {b.id.replace("KD-", "")}
+              {b.fleetNumber}
             </button>
           );
         })}
@@ -107,12 +108,21 @@ export const DriverHudWidget: React.FC<DriverHudWidgetProps> = ({
         }`}
       >
         <div className="mb-2 flex items-center justify-between px-2 pt-0.5 font-mono text-[9px] text-slate-400">
-          <span>{bus.id}</span>
-          <div className="h-2.5 w-14 rounded-full bg-slate-900 ring-1 ring-slate-800" />
+          <span className="font-bold text-[#06B6D4]">{bus.id}</span>
+          <div className="h-2.5 w-12 rounded-full bg-slate-900 ring-1 ring-slate-800" />
           <span className="text-emerald-400">5G LIVE</span>
         </div>
 
         <div className="space-y-2.5 rounded-[16px] border border-slate-800/90 bg-[#0F172A] p-3">
+          {/* Selected Bus Operator & Dhaka Metro Plate Header */}
+          <div className="rounded-lg border border-slate-800 bg-slate-900/80 px-2.5 py-1.5 text-center">
+            <div className="truncate text-[11px] font-bold text-slate-100">
+              {bus.operatorName}
+            </div>
+            <div className="mt-0.5 text-[10px] font-medium tracking-wide text-amber-300/95">
+              {bus.licensePlate}
+            </div>
+          </div>
           {isJammed ? (
             <div className="rounded-xl border border-rose-500/50 bg-rose-500/15 px-3 py-2 text-center">
               <div className="flex items-center justify-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-rose-300">
