@@ -8,12 +8,12 @@ import {
 } from "@/lib/simulationEngine";
 
 export const BUS_TRAJECTORY_COLORS: Record<string, string> = {
-  "KD-101": "#06B6D4", // Cyan
-  "KD-102": "#10B981", // Emerald
-  "KD-103": "#F59E0B", // Amber
-  "KD-104": "#EC4899", // Pink
-  "KD-105": "#8B5CF6", // Violet
-  "KD-106": "#38BDF8", // Sky
+  "Bikolpo-01": "#06B6D4", // Cyan
+  "Shikhor-02": "#10B981", // Emerald
+  "BRTC-03": "#F59E0B", // Amber
+  "Bikolpo-04": "#EC4899", // Pink
+  "Shikhor-05": "#8B5CF6", // Violet
+  "BRTC-06": "#38BDF8", // Sky
 };
 
 interface TimeSpaceDiagramProps {
@@ -49,13 +49,13 @@ export const TimeSpaceDiagram: React.FC<TimeSpaceDiagramProps> = ({
   const mapY = (pos: number) =>
     padTop + plotH - (Math.min(TRACK_LENGTH, Math.max(0, pos)) / TRACK_LENGTH) * plotH;
 
-  // Key stop labels along Y-axis
+  // Key stop labels along Y-axis matching authentic N-S clockwise loop positions
   const yStops = [
     { pos: 0, label: "Mirpur-10" },
-    { pos: 300, label: "Agargaon" },
-    { pos: 500, label: "Farmgate" },
-    { pos: 700, label: "Shahbag" },
-    { pos: 900, label: "Motijheel" },
+    { pos: 250, label: "Agargaon" },
+    { pos: 415, label: "Farmgate" },
+    { pos: 500, label: "Motijheel" },
+    { pos: 750, label: "Shahbag" },
   ];
 
   const busIds = Object.keys(BUS_TRAJECTORY_COLORS);
@@ -87,9 +87,9 @@ export const TimeSpaceDiagram: React.FC<TimeSpaceDiagramProps> = ({
     return paths;
   };
 
-  // Bottleneck band Y coords (Farmgate 500 -> Shahbag 700)
-  const bnTop = mapY(700);
-  const bnHeight = mapY(500) - bnTop;
+  // Bottleneck band Y coords (Farmgate lower-right section: 345 -> 475)
+  const bnTop = mapY(475);
+  const bnHeight = mapY(345) - bnTop;
 
   return (
     <div>
@@ -232,6 +232,7 @@ export const TimeSpaceDiagram: React.FC<TimeSpaceDiagramProps> = ({
         {busIds.map((id) => (
           <span
             key={id}
+            title={id}
             className={`flex items-center gap-1 ${
               id === selectedBusId
                 ? isDark
@@ -244,11 +245,11 @@ export const TimeSpaceDiagram: React.FC<TimeSpaceDiagramProps> = ({
               className="inline-block h-2 w-2 rounded-full"
               style={{ backgroundColor: BUS_TRAJECTORY_COLORS[id] }}
             />
-            {id.replace("KD-", "")}
+            {id.slice(-2)}
           </span>
         ))}
         <span className="text-[9px] text-red-400">
-          ■ {DHAKA_STOPS[5].name}–{DHAKA_STOPS[7].name} Jam
+          ■ {DHAKA_STOPS[5].name} Bottleneck
         </span>
       </div>
     </div>

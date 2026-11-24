@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Activity,
   AlertOctagon,
@@ -47,38 +47,80 @@ function getDemandLabel(demand: number): string {
   return "Rush Hour";
 }
 
-function KotoDurLogoFallback({ isDark }: { isDark: boolean }) {
+function KotoDurInlineLogo({ isDark }: { isDark: boolean }) {
   return (
     <svg
-      viewBox="0 0 40 40"
-      className="h-9 w-9 shrink-0"
+      viewBox="0 0 182 38"
+      className="h-9 w-auto shrink-0"
       fill="none"
+      role="img"
       aria-label="KotoDur Logo"
     >
+      {/* Stylized Road-K Emblem */}
       <rect
         x="1"
-        y="1"
-        width="38"
-        height="38"
-        rx="10"
+        y="2"
+        width="34"
+        height="34"
+        rx="9"
         fill={isDark ? "#0b1220" : "#0F172A"}
         stroke="#06B6D4"
-        strokeOpacity="0.55"
-        strokeWidth="1.5"
+        strokeOpacity="0.6"
+        strokeWidth="1.4"
       />
-      <rect
-        x="7"
-        y="11"
-        width="26"
-        height="18"
-        rx="9"
+      {/* Vertical road stem of K */}
+      <path
+        d="M11 9.5V28.5"
+        stroke="#F8FAFC"
+        strokeWidth="4.2"
+        strokeLinecap="round"
+      />
+      <path
+        d="M11 11.5V26.5"
         stroke="#06B6D4"
-        strokeWidth="2.2"
-        strokeDasharray="4 3"
+        strokeWidth="1.1"
+        strokeDasharray="2.5 2.5"
       />
-      <circle cx="14" cy="11" r="3.2" fill="#10B981" />
-      <circle cx="27" cy="29" r="3.2" fill="#F59E0B" />
-      <circle cx="33" cy="20" r="2.6" fill="#06B6D4" />
+      {/* Upper & lower highway branches of K */}
+      <path
+        d="M13 19L24.5 9.8"
+        stroke="#06B6D4"
+        strokeWidth="3.6"
+        strokeLinecap="round"
+      />
+      <path
+        d="M14.5 18.2L25 28.2"
+        stroke="#F59E0B"
+        strokeWidth="3.6"
+        strokeLinecap="round"
+      />
+      {/* Live transit node dot */}
+      <circle cx="25" cy="9.8" r="2.2" fill="#10B981" />
+
+      {/* "Koto" + cyan "Dur" wordmark */}
+      <text
+        x="44"
+        y="25.5"
+        fontFamily="ui-sans-serif, system-ui, -apple-system, sans-serif"
+        fontSize="21"
+        fontWeight="800"
+        letterSpacing="-0.5"
+      >
+        <tspan fill={isDark ? "#F8FAFC" : "#0F172A"}>Koto</tspan>
+        <tspan fill="#06B6D4">Dur</tspan>
+      </text>
+
+      {/* Subtle Bengali badge */}
+      <text
+        x="133"
+        y="24.5"
+        fontFamily="ui-sans-serif, system-ui, -apple-system, sans-serif"
+        fontSize="11.5"
+        fontWeight="700"
+        fill={isDark ? "#94A3B8" : "#64748B"}
+      >
+        কতদূর
+      </text>
     </svg>
   );
 }
@@ -92,7 +134,7 @@ export default function KotoDurDashboard() {
   const [config, setConfig] = useState<SimulationConfig>(DEFAULT_CONFIG);
   const [isPaused, setIsPaused] = useState(false);
   const [theme, setTheme] = useState<"dark" | "light">("light");
-  const [selectedBusId, setSelectedBusId] = useState<string>("KD-102");
+  const [selectedBusId, setSelectedBusId] = useState<string>("Shikhor-02");
   const [showHeadwayLinks, setShowHeadwayLinks] = useState<boolean>(true);
   const [chartTab, setChartTab] = useState<"variance" | "timespace">(
     "variance"
@@ -101,11 +143,27 @@ export default function KotoDurDashboard() {
     null
   );
   const [isAlgoModalOpen, setIsAlgoModalOpen] = useState(false);
-  const [logoError, setLogoError] = useState(false);
+  const [hasCustomLogo, setHasCustomLogo] = useState(false);
   const [lastJamNotice, setLastJamNotice] = useState<string | null>(null);
   const [snapshot, setSnapshot] = useState<SimulationSnapshot>(() =>
     engineRef.current!.getSnapshot()
   );
+
+  // Silently check if /logo.png exists without ever flashing a broken image icon
+  useEffect(() => {
+    let active = true;
+    const probe = new window.Image();
+    probe.onload = () => {
+      if (active && probe.naturalWidth > 0) setHasCustomLogo(true);
+    };
+    probe.onerror = () => {
+      if (active) setHasCustomLogo(false);
+    };
+    probe.src = "/logo.png";
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const updateEngineConfig = useCallback(
     (partial: Partial<SimulationConfig>, clearPreset = false) => {
@@ -178,42 +236,26 @@ export default function KotoDurDashboard() {
         }`}
       >
         <div className="mx-auto flex max-w-[1680px] flex-wrap items-center justify-between gap-3 px-4 py-2.5 sm:px-6">
-          {/* Brand Identity with /logo.png + SVG Fallback */}
-          <div className="flex items-center gap-3">
-            {!logoError ? (
+          {/* Brand Identity: uses /logo.png when available, otherwise crisp inline Road-K SVG */}
+          <div className="flex min-w-0 flex-col">
+            {hasCustomLogo ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src="/logo.png"
-                alt="KotoDur Logo"
-                onError={() => setLogoError(true)}
-                className="h-9 w-9 shrink-0 rounded-xl border border-[#06B6D4]/40 object-contain"
+                alt="KotoDur"
+                onError={() => setHasCustomLogo(false)}
+                className="h-9 w-auto max-w-[168px] object-contain"
               />
             ) : (
-              <KotoDurLogoFallback isDark={isDark} />
+              <KotoDurInlineLogo isDark={isDark} />
             )}
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-base font-extrabold tracking-tight sm:text-lg">
-                  KotoDur
-                </h1>
-                <span
-                  className={`rounded border px-1.5 py-0.5 text-[11px] font-semibold text-[#06B6D4] ${
-                    isDark
-                      ? "border-slate-700/80 bg-slate-900"
-                      : "border-cyan-200 bg-cyan-50"
-                  }`}
-                >
-                  কতদূর
-                </span>
-              </div>
-              <p
-                className={`text-[11px] sm:text-xs ${
-                  isDark ? "text-slate-400" : "text-slate-500"
-                }`}
-              >
-                Dynamic Bus Headway &amp; Bunching Control Simulator
-              </p>
-            </div>
+            <p
+              className={`truncate pl-0.5 text-[11px] ${
+                isDark ? "text-slate-400" : "text-slate-500"
+              }`}
+            >
+              Dynamic Bus Headway &amp; Bunching Control Simulator
+            </p>
           </div>
 
           {/* Center-Right: Prominent Master Toggle Switch */}
@@ -655,8 +697,8 @@ export default function KotoDurDashboard() {
               </div>
             </div>
 
-            {/* 60fps HTML5 Canvas */}
-            <div className="min-h-[490px] flex-1 lg:min-h-[580px]">
+            {/* 60fps HTML5 Canvas (tall vertical container for N-S Dhaka stadium loop) */}
+            <div className="min-h-[560px] flex-1 lg:min-h-[680px]">
               <SimulationCanvas
                 engineRef={
                   engineRef as React.MutableRefObject<BusSimulationEngine>

@@ -23,7 +23,14 @@ export interface BusStop {
 }
 
 export interface Bus {
+  /** Short display label for canvas & telemetry (e.g. Bikolpo-01, Shikhor-02) */
   id: string;
+  /** Two-digit fleet selector number ("01" to "06") */
+  fleetNumber: string;
+  /** Full Dhaka bus operator name */
+  operatorName: string;
+  /** Dhaka Metro registration license plate */
+  licensePlate: string;
   /** Position along the closed loop in [0, TRACK_LENGTH) */
   position: number;
   /** Current linear speed in track units / second */
@@ -167,17 +174,63 @@ export const DHAKA_STOPS: ReadonlyArray<{
   name: string;
   bnName: string;
   demandWeight: number;
+  /** Explicit clockwise loop position in [0, TRACK_LENGTH): 0 = North (Mirpur-10), 500 = South (Motijheel) */
+  position: number;
 }> = [
-  { name: "Mirpur-10", bnName: "মিরপুর-১০", demandWeight: 1.25 },
-  { name: "Kazipara", bnName: "কাজীপাড়া", demandWeight: 0.9 },
-  { name: "Shewrapara", bnName: "শেওড়াপাড়া", demandWeight: 0.95 },
-  { name: "Agargaon", bnName: "আগারগাঁও", demandWeight: 1.0 },
-  { name: "Bijoy Sarani", bnName: "বিজয় সরণি", demandWeight: 0.85 },
-  { name: "Farmgate", bnName: "ফার্মগেট", demandWeight: 1.45 },
-  { name: "Karwan Bazar", bnName: "কারওয়ান বাজার", demandWeight: 1.15 },
-  { name: "Shahbag", bnName: "শাহবাগ", demandWeight: 1.2 },
-  { name: "Press Club", bnName: "প্রেস ক্লাব", demandWeight: 0.9 },
-  { name: "Motijheel", bnName: "মতিঝিল", demandWeight: 1.35 },
+  { name: "Mirpur-10", bnName: "মিরপুর-১০", demandWeight: 1.25, position: 0 },
+  { name: "Kazipara", bnName: "কাজীপাড়া", demandWeight: 0.9, position: 85 },
+  { name: "Shewrapara", bnName: "শেওড়াপাড়া", demandWeight: 0.95, position: 165 },
+  { name: "Agargaon", bnName: "আগারগাঁও", demandWeight: 1.0, position: 250 },
+  { name: "Bijoy Sarani", bnName: "বিজয় সরণি", demandWeight: 0.85, position: 335 },
+  { name: "Farmgate", bnName: "ফার্মগেট", demandWeight: 1.45, position: 415 },
+  { name: "Motijheel", bnName: "মতিঝিল", demandWeight: 1.35, position: 500 },
+  { name: "Press Club", bnName: "প্রেস ক্লাব", demandWeight: 0.9, position: 625 },
+  { name: "Shahbag", bnName: "শাহবাগ", demandWeight: 1.2, position: 750 },
+  { name: "Karwan Bazar", bnName: "কারওয়ান বাজার", demandWeight: 1.15, position: 875 },
+];
+
+export const DHAKA_BUS_FLEET: ReadonlyArray<{
+  id: string;
+  fleetNumber: string;
+  operatorName: string;
+  licensePlate: string;
+}> = [
+  {
+    id: "Bikolpo-01",
+    fleetNumber: "01",
+    operatorName: "Bikolpo Auto Service",
+    licensePlate: "ঢাকা মেট্রো-ব-১১-২৪০১",
+  },
+  {
+    id: "Shikhor-02",
+    fleetNumber: "02",
+    operatorName: "Shikhor Paribahan",
+    licensePlate: "ঢাকা মেট্রো-ব-১৫-৪৮১২",
+  },
+  {
+    id: "BRTC-03",
+    fleetNumber: "03",
+    operatorName: "BRTC Articulated",
+    licensePlate: "ঢাকা মেট্রো-ব-১১-৯০০৩",
+  },
+  {
+    id: "Bikolpo-04",
+    fleetNumber: "04",
+    operatorName: "Bikolpo Auto Service",
+    licensePlate: "ঢাকা মেট্রো-ব-১১-২৪০৪",
+  },
+  {
+    id: "Shikhor-05",
+    fleetNumber: "05",
+    operatorName: "Shikhor Paribahan",
+    licensePlate: "ঢাকা মেট্রো-ব-১৫-৪৮০৫",
+  },
+  {
+    id: "BRTC-06",
+    fleetNumber: "06",
+    operatorName: "BRTC Articulated",
+    licensePlate: "ঢাকা মেট্রো-ব-১১-৯০০৬",
+  },
 ];
 
 export const DEFAULT_CONFIG: SimulationConfig = {
@@ -273,16 +326,18 @@ export function forwardDistance(fromPos: number, toPos: number): number {
 }
 
 /**
- * Computes stadium (rounded oval) track geometry that fits neatly inside a canvas.
+ * Computes a tall vertical stadium (capsule) track geometry oriented North-to-South
+ * to match Dhaka's Mirpur-10 (North) -> Motijheel (South) corridor.
  */
 export function computeTrackGeometry(width: number, height: number): TrackGeometry {
-  const padX = Math.max(88, width * 0.14);
-  const padY = Math.max(76, height * 0.19);
-  const availW = Math.max(200, width - padX * 2);
-  const availH = Math.max(140, height - padY * 2);
+  const padX = Math.max(118, width * 0.22);
+  const padY = Math.max(58, height * 0.11);
+  const availW = Math.max(180, width - padX * 2);
+  const availH = Math.max(260, height - padY * 2);
 
-  const radius = Math.min(availH / 2, availW * 0.28);
-  const straightLength = Math.max(40, availW - radius * 2);
+  // Horizontal radius of top & bottom semicircles; keep wide enough for center HUD
+  const radius = Math.min(availW / 2, availH * 0.28);
+  const straightLength = Math.max(80, availH - radius * 2);
   const perimeter = 2 * straightLength + 2 * Math.PI * radius;
 
   return {
@@ -296,30 +351,23 @@ export function computeTrackGeometry(width: number, height: number): TrackGeomet
 
 /**
  * Maps a track position in [0, TRACK_LENGTH) to exact arc-length coordinates,
- * tangent angle (clockwise), and outward normal vector on the stadium oval.
+ * tangent angle (clockwise), and outward normal vector on the vertical stadium loop.
  *
- * Position 0 starts at top-left of the top straight segment (Mirpur-10)
- * and proceeds clockwise: top straight -> right semicircle -> bottom straight -> left semicircle.
+ * Position 0 starts at the North top apex (Mirpur-10) and proceeds clockwise:
+ * top-right arc -> right straightaway (Southbound) -> bottom arc -> left straightaway (Northbound) -> top-left arc.
  */
 export function getTrackPoint(position: number, geo: TrackGeometry): TrackPoint {
   const norm = wrapPosition(position) / TRACK_LENGTH;
   const dist = norm * geo.perimeter;
   const halfStraight = geo.straightLength / 2;
+  const quarterArc = (Math.PI * geo.radius) / 2;
   const semiArc = Math.PI * geo.radius;
 
-  // Segment 1: Top straight (left -> right)
-  if (dist < geo.straightLength) {
-    const x = geo.centerX - halfStraight + dist;
-    const y = geo.centerY - geo.radius;
-    return { x, y, angle: 0, normalX: 0, normalY: -1 };
-  }
-
-  // Segment 2: Right semicircle (top -> bottom, clockwise)
-  const d2 = dist - geo.straightLength;
-  if (d2 < semiArc) {
-    const theta = -Math.PI / 2 + d2 / geo.radius;
-    const x = geo.centerX + halfStraight + geo.radius * Math.cos(theta);
-    const y = geo.centerY + geo.radius * Math.sin(theta);
+  // Segment 1: Top-right quarter arc (North apex -> top of right straightaway)
+  if (dist < quarterArc) {
+    const theta = -Math.PI / 2 + dist / geo.radius;
+    const x = geo.centerX + geo.radius * Math.cos(theta);
+    const y = geo.centerY - halfStraight + geo.radius * Math.sin(theta);
     return {
       x,
       y,
@@ -329,19 +377,42 @@ export function getTrackPoint(position: number, geo: TrackGeometry): TrackPoint 
     };
   }
 
-  // Segment 3: Bottom straight (right -> left)
-  const d3 = d2 - semiArc;
-  if (d3 < geo.straightLength) {
-    const x = geo.centerX + halfStraight - d3;
-    const y = geo.centerY + geo.radius;
-    return { x, y, angle: Math.PI, normalX: 0, normalY: 1 };
+  // Segment 2: Right straightaway (Southbound: top -> bottom)
+  const d2 = dist - quarterArc;
+  if (d2 < geo.straightLength) {
+    const x = geo.centerX + geo.radius;
+    const y = geo.centerY - halfStraight + d2;
+    return { x, y, angle: Math.PI / 2, normalX: 1, normalY: 0 };
   }
 
-  // Segment 4: Left semicircle (bottom -> top, clockwise)
-  const d4 = d3 - geo.straightLength;
-  const theta = Math.PI / 2 + d4 / geo.radius;
-  const x = geo.centerX - halfStraight + geo.radius * Math.cos(theta);
-  const y = geo.centerY + geo.radius * Math.sin(theta);
+  // Segment 3: Bottom semicircle (right -> South apex -> left, clockwise)
+  const d3 = d2 - geo.straightLength;
+  if (d3 < semiArc) {
+    const theta = d3 / geo.radius;
+    const x = geo.centerX + geo.radius * Math.cos(theta);
+    const y = geo.centerY + halfStraight + geo.radius * Math.sin(theta);
+    return {
+      x,
+      y,
+      angle: theta + Math.PI / 2,
+      normalX: Math.cos(theta),
+      normalY: Math.sin(theta),
+    };
+  }
+
+  // Segment 4: Left straightaway (Northbound: bottom -> top)
+  const d4 = d3 - semiArc;
+  if (d4 < geo.straightLength) {
+    const x = geo.centerX - geo.radius;
+    const y = geo.centerY + halfStraight - d4;
+    return { x, y, angle: -Math.PI / 2, normalX: -1, normalY: 0 };
+  }
+
+  // Segment 5: Top-left quarter arc (top of left straightaway -> North apex)
+  const d5 = d4 - geo.straightLength;
+  const theta = Math.PI + d5 / geo.radius;
+  const x = geo.centerX + geo.radius * Math.cos(theta);
+  const y = geo.centerY - halfStraight + geo.radius * Math.sin(theta);
   return {
     x,
     y,
@@ -386,11 +457,11 @@ export class BusSimulationEngine {
 
   constructor(initialConfig?: Partial<SimulationConfig>) {
     this.config = { ...DEFAULT_CONFIG, ...initialConfig };
-    // Farmgate is stop 5 (pos 500), Karwan Bazar is stop 6 (pos 600), Shahbag is stop 7 (pos 700)
+    // Lower-right Farmgate southbound bottleneck section (between Bijoy Sarani and Motijheel)
     this.bottleneck = {
-      name: "Farmgate – Shahbag Traffic Bottleneck",
-      startPosition: 500,
-      endPosition: 700,
+      name: "Farmgate Lower-Right Traffic Bottleneck",
+      startPosition: 345,
+      endPosition: 475,
       speedFactor: this.config.bottleneckSpeedFactor,
       enabled: this.config.bottleneckEnabled,
     };
@@ -422,14 +493,13 @@ export class BusSimulationEngine {
       bunchedIntegral: 0,
     };
 
-    // 10 evenly spaced stops around the closed loop (deterministic initial seed for zero SSR hydration mismatch)
-    const stopSpacing = TRACK_LENGTH / DHAKA_STOPS.length;
+    // 10 authentic North-to-South clockwise Dhaka stops (deterministic initial seed for zero SSR hydration mismatch)
     this.stops = DHAKA_STOPS.map((def, idx) => {
       const stop: BusStop = {
         id: idx,
         name: def.name,
         bnName: def.bnName,
-        position: idx * stopSpacing,
+        position: def.position,
         demandWeight: def.demandWeight,
         waitingPassengers: [],
         totalBoarded: 0,
@@ -441,14 +511,17 @@ export class BusSimulationEngine {
       return stop;
     });
 
-    // Spawn 6 buses KD-101 to KD-106 evenly spaced along the track
-    const busCount = 6;
+    // Spawn 6 realistic Dhaka Mirpur-Motijheel corridor buses evenly spaced along the track
+    const busCount = DHAKA_BUS_FLEET.length;
     const busSpacing = TRACK_LENGTH / busCount;
-    this.buses = Array.from({ length: busCount }, (_, idx) => {
+    this.buses = DHAKA_BUS_FLEET.map((spec, idx) => {
       const startPos = wrapPosition(idx * busSpacing + 35);
       const cruiseSpeed = BUS_BASE_SPEED * this.config.baseSpeedMultiplier;
       return {
-        id: `KD-${101 + idx}`,
+        id: spec.id,
+        fleetNumber: spec.fleetNumber,
+        operatorName: spec.operatorName,
+        licensePlate: spec.licensePlate,
         position: startPos,
         speed: cruiseSpeed,
         baseSpeed: BUS_BASE_SPEED,

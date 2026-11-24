@@ -131,11 +131,11 @@ function traceTrackPath(ctx: CanvasRenderingContext2D, geo: TrackGeometry) {
   const halfS = geo.straightLength / 2;
   const { centerX: cx, centerY: cy, radius: r } = geo;
   ctx.beginPath();
-  ctx.moveTo(cx - halfS, cy - r);
-  ctx.lineTo(cx + halfS, cy - r);
-  ctx.arc(cx + halfS, cy, r, -Math.PI / 2, Math.PI / 2, false);
-  ctx.lineTo(cx - halfS, cy + r);
-  ctx.arc(cx - halfS, cy, r, Math.PI / 2, (3 * Math.PI) / 2, false);
+  // Vertical capsule/stadium: top semicircle -> right straightaway -> bottom semicircle -> left straightaway
+  ctx.arc(cx, cy - halfS, r, Math.PI, 0, false);
+  ctx.lineTo(cx + r, cy + halfS);
+  ctx.arc(cx, cy + halfS, r, 0, Math.PI, false);
+  ctx.lineTo(cx - r, cy - halfS);
   ctx.closePath();
 }
 
@@ -371,7 +371,7 @@ function drawScene(
 
   // 6. Stops & Waiting Passenger Dots
   for (const stop of engine.stops) {
-    drawStopAndPassengers(ctx, geo, stop, palette, width);
+    drawStopAndPassengers(ctx, geo, stop, palette, width, height);
   }
 
   // 7. Visual Headway Link Lines connecting each bus to the bus ahead
@@ -424,23 +424,21 @@ function drawBottleneckZone(
   ctx.stroke();
   ctx.setLineDash([]);
 
-  // Bottleneck callout badge placed slightly inside the loop near Karwan Bazar (midpoint)
-  const midPos = (startPosition + endPosition) / 2;
-  const midPt = getTrackPoint(midPos, geo);
-  const badgeX = midPt.x - midPt.normalX * 36;
-  const badgeY = midPt.y - midPt.normalY * 36;
+  // Bottleneck callout badge centered cleanly inside the lower inner loop (never touching track lines or center HUD)
+  const badgeX = geo.centerX;
+  const badgeY = geo.centerY + Math.min(geo.straightLength / 2 + 12, 76);
 
   const dropPct = Math.round((1 - engine.bottleneck.speedFactor) * 100);
-  const label = `TRAFFIC BOTTLENECK • -${dropPct}% SPEED`;
-  ctx.font = "700 10px ui-sans-serif, system-ui, -apple-system, sans-serif";
+  const label = `BOTTLENECK (-${dropPct}% SPEED)`;
+  ctx.font = "700 9.5px ui-sans-serif, system-ui, -apple-system, sans-serif";
   const textW = ctx.measureText(label).width;
-  const bw = textW + 18;
-  const bh = 20;
+  const bw = textW + 16;
+  const bh = 19;
 
-  drawRoundedRect(ctx, badgeX - bw / 2, badgeY - bh / 2, bw, bh, 10);
+  drawRoundedRect(ctx, badgeX - bw / 2, badgeY - bh / 2, bw, bh, 9.5);
   ctx.fillStyle = palette.bottleneckBadgeBg;
   ctx.fill();
-  ctx.strokeStyle = "rgba(248, 113, 113, 0.65)";
+  ctx.strokeStyle = "rgba(248, 113, 113, 0.7)";
   ctx.lineWidth = 1;
   ctx.stroke();
 
@@ -481,7 +479,9 @@ function drawCenterStatus(
   engine: BusSimulationEngine,
   palette: Palette
 ) {
-  const { centerX: cx, centerY: cy } = geo;
+  const { centerX: cx } = geo;
+  // Slightly above geometric center so it stays well clear of the lower bottleneck badge
+  const cy = geo.centerY - 14;
   const metrics = engine.getMetrics();
   const isAi = engine.config.isAiControlEnabled;
 
@@ -491,30 +491,32 @@ function drawCenterStatus(
 
   // Brand Title
   ctx.fillStyle = palette.centerTitle;
-  ctx.font = "800 20px ui-sans-serif, system-ui, -apple-system, sans-serif";
-  ctx.fillText("KotoDur  কতদূর", cx, cy - 28);
+  ctx.font = "800 17px ui-sans-serif, system-ui, -apple-system, sans-serif";
+  ctx.fillText("KotoDur  কতদূর", cx, cy - 26);
 
-  // Mode Pill
-  const modeText = isAi
-    ? "AI HEADWAY EQUALIZATION ACTIVE"
-    : "UNCONTROLLED MODE (BUNCHING PRONE)";
-  ctx.font = "700 10.5px ui-sans-serif, system-ui, -apple-system, sans-serif";
-  const mw = ctx.measureText(modeText).width + 24;
-  drawRoundedRect(ctx, cx - mw / 2, cy - 9, mw, 22, 11);
-  ctx.fillStyle = isAi ? "rgba(16, 185, 129, 0.16)" : "rgba(244, 63, 94, 0.14)";
+  // Mode Pill (compact for vertical stadium interior)
+  const modeText = isAi ? "AI HEADWAY CONTROL" : "UNCONTROLLED MODE";
+  ctx.font = "700 9.5px ui-sans-serif, system-ui, -apple-system, sans-serif";
+  const mw = ctx.measureText(modeText).width + 18;
+  drawRoundedRect(ctx, cx - mw / 2, cy - 9, mw, 20, 10);
+  ctx.fillStyle = isAi ? "rgba(6, 182, 212, 0.16)" : "rgba(245, 158, 11, 0.16)";
   ctx.fill();
-  ctx.strokeStyle = isAi ? "rgba(16, 185, 129, 0.6)" : "rgba(244, 63, 94, 0.55)";
+  ctx.strokeStyle = isAi ? "rgba(6, 182, 212, 0.6)" : "rgba(245, 158, 11, 0.6)";
   ctx.lineWidth = 1;
   ctx.stroke();
 
-  ctx.fillStyle = isAi ? "#10b981" : "#f43f5e";
-  ctx.fillText(modeText, cx, cy + 2.5);
+  ctx.fillStyle = isAi ? "#0891b2" : "#d97706";
+  ctx.fillText(modeText, cx, cy + 1.5);
 
-  // Compact live summary line
+  // Compact two-line live summary so it never touches left/right headway links
   ctx.fillStyle = palette.centerSub;
-  ctx.font = "500 11.5px ui-monospace, SFMono-Regular, Menlo, monospace";
-  const summary = `Ideal H*: ${metrics.idealHeadway.toFixed(1)}s  •  CV: ${metrics.headwayCv.toFixed(0)}%  •  Waiting: ${metrics.totalWaiting}`;
-  ctx.fillText(summary, cx, cy + 30);
+  ctx.font = "600 10.5px ui-monospace, SFMono-Regular, Menlo, monospace";
+  ctx.fillText(
+    `H*: ${metrics.idealHeadway.toFixed(1)}s  •  CV: ${metrics.headwayCv.toFixed(0)}%`,
+    cx,
+    cy + 25
+  );
+  ctx.fillText(`Waiting: ${metrics.totalWaiting} pax`, cx, cy + 41);
 
   ctx.restore();
 }
@@ -524,14 +526,15 @@ function drawStopAndPassengers(
   geo: TrackGeometry,
   stop: BusStop,
   palette: Palette,
-  canvasWidth: number
+  canvasWidth: number,
+  canvasHeight: number
 ) {
   const pt = getTrackPoint(stop.position, geo);
   const tangentX = Math.cos(pt.angle);
   const tangentY = Math.sin(pt.angle);
   const waitCount = stop.waitingPassengers.length;
 
-  // 1. Waiting passenger dots clustered beside the stop (outer side of oval)
+  // 1. Waiting passenger dots clustered beside the stop (outer side of vertical oval)
   const dotColor =
     waitCount >= 18
       ? palette.passengerCrowded
@@ -565,24 +568,16 @@ function drawStopAndPassengers(
         : palette.stopStroke;
   ctx.stroke();
 
-  // Small center dot
   ctx.beginPath();
   ctx.arc(pt.x, pt.y, 2, 0, Math.PI * 2);
   ctx.fillStyle = palette.stopStroke;
   ctx.fill();
 
-  // 3. Stop name label (positioned cleanly on outer side beyond passenger cluster or inner side if crowded)
-  // Place labels on the outer normal, offset smartly depending on top/bottom/sides
-  const isSide = Math.abs(pt.normalX) > 0.65;
-  const labelDist = isSide ? 42 : 48;
-  let lx = pt.x + pt.normalX * labelDist;
-  let ly = pt.y + pt.normalY * labelDist;
-
-  // Keep side labels inside canvas horizontal bounds
-  const compact = canvasWidth < 680;
+  // 3. Stop name label aligned cleanly outside the vertical stadium
+  const compact = canvasWidth < 560;
   ctx.font = compact
-    ? "600 10px ui-sans-serif, system-ui, -apple-system, sans-serif"
-    : "600 11px ui-sans-serif, system-ui, -apple-system, sans-serif";
+    ? "600 9.5px ui-sans-serif, system-ui, -apple-system, sans-serif"
+    : "600 10.5px ui-sans-serif, system-ui, -apple-system, sans-serif";
   const countSuffix = waitCount > 0 ? ` (${waitCount})` : "";
   const text = `${stop.name}${countSuffix}`;
   const tw = ctx.measureText(text).width;
@@ -590,11 +585,24 @@ function drawStopAndPassengers(
   const boxW = tw + padX * 2;
   const boxH = 20;
 
-  if (pt.normalX > 0.5) {
-    lx = Math.min(canvasWidth - boxW / 2 - 8, lx + boxW * 0.25);
-  } else if (pt.normalX < -0.5) {
-    lx = Math.max(boxW / 2 + 8, lx - boxW * 0.25);
+  let lx: number;
+  let ly: number;
+
+  if (Math.abs(pt.normalX) > 0.35) {
+    // Left or Right side of vertical loop: place label cleanly outward horizontally
+    const sideDir = pt.normalX > 0 ? 1 : -1;
+    const edgeGap = 38;
+    lx = pt.x + sideDir * (edgeGap + boxW / 2);
+    ly = pt.y + pt.normalY * 14;
+  } else {
+    // North (top) or South (bottom) apex: center label neatly above or below
+    lx = pt.x;
+    ly = pt.y + pt.normalY * 42;
   }
+
+  // Clamp neatly inside canvas bounds
+  lx = Math.max(boxW / 2 + 8, Math.min(canvasWidth - boxW / 2 - 8, lx));
+  ly = Math.max(boxH / 2 + 8, Math.min(canvasHeight - boxH / 2 - 8, ly));
 
   drawRoundedRect(ctx, lx - boxW / 2, ly - boxH / 2, boxW, boxH, 6);
   ctx.fillStyle = palette.stopLabelBg;
@@ -864,27 +872,46 @@ function drawBus(
   }
   ctx.restore();
 
-  // 3. Bus ID Tag (positioned slightly inward so it doesn't collide with outer stop labels)
-  const tagOffsetX = -pt.normalX * 22;
-  const tagOffsetY = -pt.normalY * 22;
-  ctx.font = "700 9.5px ui-monospace, SFMono-Regular, Menlo, monospace";
-  const idW = ctx.measureText(bus.id).width + 8;
-  drawRoundedRect(ctx, tagOffsetX - idW / 2, tagOffsetY - 7.5, idW, 15, 4);
-  ctx.fillStyle = isSelected ? "#0ea5e9" : palette.busIdBg;
+  // 3. Bus Short Label Tag on the INNER side of the track loop (facing inward, zero overlap with outer stop labels)
+  ctx.font = "700 8.5px ui-monospace, SFMono-Regular, Menlo, monospace";
+  const idW = ctx.measureText(bus.id).width + 9;
+  const idH = 14.5;
+
+  let tagOffsetX: number;
+  let tagOffsetY: number;
+  if (Math.abs(pt.normalX) > 0.35) {
+    const inwardDir = pt.normalX > 0 ? -1 : 1;
+    tagOffsetX = inwardDir * (21 + idW / 2);
+    tagOffsetY = -pt.normalY * 10;
+  } else {
+    tagOffsetX = 0;
+    tagOffsetY = -pt.normalY * 26;
+  }
+
+  drawRoundedRect(
+    ctx,
+    tagOffsetX - idW / 2,
+    tagOffsetY - idH / 2,
+    idW,
+    idH,
+    4
+  );
+  ctx.fillStyle = isSelected ? "#06B6D4" : palette.busIdBg;
   ctx.fill();
-  ctx.fillStyle = palette.busIdText;
+  ctx.fillStyle = isSelected ? "#0f172a" : palette.busIdText;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText(bus.id, tagOffsetX, tagOffsetY + 0.5);
 
-  // 4. Jammed or Holding Countdown Badge
+  // 4. Jammed or Holding Countdown Badge (stacked neatly beside the inner bus label)
   if (bus.jamTimer > 0) {
     const jamText = `JAM ${bus.jamTimer.toFixed(1)}s`;
-    ctx.font = "800 10px ui-monospace, SFMono-Regular, Menlo, monospace";
-    const cw = ctx.measureText(jamText).width + 12;
-    const badgeY = -28;
+    ctx.font = "800 9.5px ui-monospace, SFMono-Regular, Menlo, monospace";
+    const cw = ctx.measureText(jamText).width + 11;
+    const bx = tagOffsetX;
+    const by = tagOffsetY - 17;
 
-    drawRoundedRect(ctx, -cw / 2, badgeY - 9, cw, 18, 9);
+    drawRoundedRect(ctx, bx - cw / 2, by - 8.5, cw, 17, 8.5);
     ctx.fillStyle = "#991b1b";
     ctx.fill();
     ctx.strokeStyle = "#f87171";
@@ -894,14 +921,15 @@ function drawBus(
     ctx.fillStyle = "#fee2e2";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(jamText, 0, badgeY + 0.5);
+    ctx.fillText(jamText, bx, by + 0.5);
   } else if (bus.state === "HOLDING") {
     const countdownText = `HOLD ${Math.max(0, bus.stateTimer).toFixed(1)}s`;
-    ctx.font = "800 10px ui-monospace, SFMono-Regular, Menlo, monospace";
-    const cw = ctx.measureText(countdownText).width + 12;
-    const badgeY = -28;
+    ctx.font = "800 9.5px ui-monospace, SFMono-Regular, Menlo, monospace";
+    const cw = ctx.measureText(countdownText).width + 11;
+    const bx = tagOffsetX;
+    const by = tagOffsetY - 17;
 
-    drawRoundedRect(ctx, -cw / 2, badgeY - 9, cw, 18, 9);
+    drawRoundedRect(ctx, bx - cw / 2, by - 8.5, cw, 17, 8.5);
     ctx.fillStyle = "#b45309";
     ctx.fill();
     ctx.strokeStyle = "#fbbf24";
@@ -911,7 +939,7 @@ function drawBus(
     ctx.fillStyle = "#fef3c7";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(countdownText, 0, badgeY + 0.5);
+    ctx.fillText(countdownText, bx, by + 0.5);
   }
 
   ctx.restore();
